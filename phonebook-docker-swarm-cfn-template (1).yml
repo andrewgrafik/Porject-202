@@ -1,12 +1,15 @@
 AWSTemplateFormatVersion: 2010-09-09
+
 Description: >
   This Cloudformation Template deploys Phonebook Application to five Docker Machines on EC2 Instances
   which are ready for Docker Swarm operations.
+
 Parameters:
   KeyPairName:
     Description: Enter the name of your Key Pair for SSH connections.
     Type: AWS::EC2::KeyPair::KeyName
     ConstraintDescription: Must be one of the existing EC2 KeyPair
+
 Resources:
   InstanceConnectPolicy:
     Type: "AWS::IAM::ManagedPolicy"
@@ -24,6 +27,7 @@ Resources:
             Action:
               - ec2:DescribeInstances
             Resource: "*"
+  
   EC2InstanceConnect:
     Type: "AWS::IAM::Role"
     Properties:
@@ -38,11 +42,13 @@ Resources:
       ManagedPolicyArns:
         - !Ref InstanceConnectPolicy
         - arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryFullAccess
+  
   EC2ConnectProfile:
     Type: "AWS::IAM::InstanceProfile"
     Properties:
       Roles: #required
         - !Ref EC2InstanceConnect
+
   DockerMachinesSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -76,6 +82,7 @@ Resources:
           FromPort: 8080
           ToPort: 8080
           CidrIp: 0.0.0.0/0
+  
   DockerSwarmManagerLT:
     Type: "AWS::EC2::LaunchTemplate"
     Properties:
@@ -112,6 +119,7 @@ Resources:
               mkdir -p /home/ec2-user/.docker
               cd /home/ec2-user/.docker
               echo '{"credsStore": "ecr-login"}' > config.json
+
   DockerSwarmWorkerLT:
     Type: "AWS::EC2::LaunchTemplate"
     Properties:
@@ -148,6 +156,7 @@ Resources:
               mkdir -p /home/ec2-user/.docker
               cd /home/ec2-user/.docker
               echo '{"credsStore": "ecr-login"}' > config.json
+
   DockerManager1:
     Type: AWS::EC2::Instance
     Properties:
@@ -213,3 +222,86 @@ Resources:
               APP_REPO_NAME: clarusway-repo/phonebook-app
               GITHUB_REPO: https://github.com/andrewgrafik/Project-202.git
               GIT_FILE_URL: https://raw.githubusercontent.com/andrewgrafik/Project-202/master/
+  DockerManager2:
+    Type: AWS::EC2::Instance
+    DependsOn:
+      - DockerManager1
+    Properties:
+      LaunchTemplate:
+        LaunchTemplateId: !Ref DockerSwarmManagerLT
+        Version: !GetAtt DockerSwarmManagerLT.LatestVersionNumber 
+      Tags:                
+        -                        
+          Key: Name
+          Value: !Sub Docker Manager 2nd of ${AWS::StackName} 
+
+  DockerManager3:
+    Type: AWS::EC2::Instance
+    DependsOn:
+      - DockerManager2
+    Properties:
+      LaunchTemplate:
+        LaunchTemplateId: !Ref DockerSwarmManagerLT
+        Version: !GetAtt DockerSwarmManagerLT.LatestVersionNumber
+      Tags:                
+        -                        
+          Key: Name
+          Value: !Sub Docker Manager 3rd of ${AWS::StackName} 
+  
+  DockerWorker1:
+    Type: AWS::EC2::Instance
+    DependsOn:
+      - DockerManager1
+    Properties:
+      LaunchTemplate:
+        LaunchTemplateId: !Ref DockerSwarmWorkerLT
+        Version: !GetAtt DockerSwarmWorkerLT.LatestVersionNumber
+      Tags:                
+        -                        
+          Key: Name
+          Value: !Sub Docker Worker 1st of ${AWS::StackName} 
+  
+  DockerWorker2:
+    Type: AWS::EC2::Instance
+    DependsOn:
+      - DockerWorker1
+    Properties:
+      LaunchTemplate:
+        LaunchTemplateId: !Ref DockerSwarmWorkerLT
+        Version: !GetAtt DockerSwarmWorkerLT.LatestVersionNumber 
+      Tags:                
+        -                        
+          Key: Name
+          Value: !Sub Docker Worker 2nd of ${AWS::StackName}
+
+Outputs:
+  1stDockerManagerDashboard:
+    Description: Dashboard for Docker Swarm
+    Value: !Sub 
+      - http://${PublicAddress}:8080
+      - PublicAddress: !GetAtt DockerManager1.PublicDnsName
+  1stDockerManagerDNSName:
+    Description: Docker Manager 1st DNS Name
+    Value: !Sub 
+      - ${PublicAddress}
+      - PublicAddress: !GetAtt DockerManager1.PublicDnsName
+  2ndDockerManagerDNSName:
+    Description: Docker Manager 2nd DNS Name
+    Value: !Sub 
+      - ${PublicAddress}
+      - PublicAddress: !GetAtt DockerManager2.PublicDnsName
+  3rdDockerManagerDNSName:
+    Description: Docker Manager 3rd DNS Name
+    Value: !Sub 
+      - ${PublicAddress}
+      - PublicAddress: !GetAtt DockerManager3.PublicDnsName
+  1stDockerWorkerDNSName:
+    Description: Docker Worker 1st DNS Name
+    Value: !Sub 
+      - ${PublicAddress}
+      - PublicAddress: !GetAtt DockerWorker1.PublicDnsName
+  2ndDockerWorkerDNSName:
+    Description: Docker Worker 2nd DNS Name
+    Value: !Sub 
+      - ${PublicAddress}
+      - PublicAddress: !GetAtt DockerWorker2.PublicDnsName
